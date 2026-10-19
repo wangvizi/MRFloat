@@ -1,0 +1,36 @@
+name: Build Deb
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Theos
+        run: |
+          export THEOS=/opt/theos
+          git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
+          SDKPATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          mkdir -p "$THEOS/sdks"
+          ln -sf "$SDKPATH" "$THEOS/sdks/iPhoneOS.sdk"
+          echo "THEOS=$THEOS" >> "$GITHUB_ENV"
+
+      - name: Build package (rootless)
+        run: |
+          export THEOS_PACKAGE_SCHEME=rootless
+          make package FINALPACKAGE=1
+
+      - name: Show output
+        run: find . -name "*.deb" -o -name "*.dylib" | head -50
+
+      - name: Upload deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: MRFloat-deb
+          path: packages/*.deb
