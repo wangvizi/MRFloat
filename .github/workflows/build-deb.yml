@@ -21,6 +21,11 @@ jobs:
           ln -sf "$SDKPATH" "$THEOS/sdks/iPhoneOS.sdk"
           echo "THEOS=$THEOS" >> "$GITHUB_ENV"
 
+      - name: Install ldid
+        run: |
+          export HOMEBREW_NO_AUTO_UPDATE=1
+          brew install ldid
+
       - name: Build package (rootless)
         run: |
           export THEOS_PACKAGE_SCHEME=rootless
