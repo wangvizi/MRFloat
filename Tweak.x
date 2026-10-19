@@ -3,86 +3,115 @@
 #import <CoreMedia/CoreMedia.h>
 #import <substrate.h>
 
-#pragma mark - 悬浮窗视图
+#pragma mark - 悬浮窗（每个视频一个独立 UIWindow）
 
-@interface MRFloatItemView : UIView
-@property (nonatomic, strong) AVPlayer *player;
-@property (nonatomic, strong) AVPlayerLayer *playerLayer;
+@interface MRFloatViewController : UIViewController
 @end
 
-@implementation MRFloatItemView
+@implementation MRFloatViewController
+@end
+
+@interface MRFloatWindow : UIWindow
+@end
+
+@implementation MRFloatWindow {
+    AVPlayer *_player;
+    AVPlayerLayer *_playerLayer;
+    UIButton *_muteBtn;
+    BOOL _muted;
+}
 
 - (instancetype)initWithURL:(NSURL *)url index:(NSUInteger)index {
-    CGFloat w = 176, h = 99;
-    CGFloat x = [UIScreen mainScreen].bounds.size.width - w - 12;
-    CGFloat y = 88 + (h + 12) * (index % 5);
+    CGFloat w = 180, h = 110;
+    CGFloat x = 10 + (index % 2) * (w + 10);
+    CGFloat y = 90 + (index / 2) * (h + 12);
+
     if ((self = [super initWithFrame:CGRectMake(x, y, w, h)])) {
-        self.backgroundColor = [UIColor blackColor];
-        self.layer.cornerRadius = 10;
-        self.layer.masksToBounds = YES;
-        self.layer.borderColor = [UIColor whiteColor].CGColor;
-        self.layer.borderWidth = 1;
+        self.windowLevel = UIWindowLevelAlert + 5;
+        self.backgroundColor = [UIColor clearColor];
 
-        self.player = [AVPlayer playerWithURL:url];
-        self.playerLayer = [AVPlayerLayer playerLayerWithPlayer:self.player];
-        self.playerLayer.frame = self.bounds;
-        self.playerLayer.videoGravity = AVLayerVideoGravityResizeAspect;
-        [self.layer addSublayer:self.playerLayer];
+        MRFloatViewController *vc = [MRFloatViewController new];
+        vc.view.backgroundColor = [UIColor blackColor];
+        vc.view.layer.cornerRadius = 10;
+        vc.view.layer.masksToBounds = YES;
+        vc.view.layer.borderColor = [UIColor whiteColor].CGColor;
+        vc.view.layer.borderWidth = 1;
+        self.rootViewController = vc;
 
-        NSString *name = url.lastPathComponent.length ? url.lastPathComponent : @"悬浮视频";
-        UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(8, 6, 112, 16)];
-        title.text = name;
-        title.font = [UIFont boldSystemFontOfSize:11];
+        _player = [AVPlayer playerWithURL:url];
+        _playerLayer = [AVPlayerLayer playerLayerWithPlayer:_player];
+        _playerLayer.frame = vc.view.bounds;
+        _playerLayer.videoGravity = AVLayerVideoGravityResizeAspect;
+        [vc.view.layer addSublayer:_playerLayer];
+
+        NSString *name = url.lastPathComponent.length ? url.lastPathComponent : @"视频";
+        UILabel *title = [[UILabel alloc] initWithFrame:CGRectMake(8, 6, 130, 15)];
+        title.text = [NSString stringWithFormat:@"#%lu %@", (unsigned long)(index + 1), name];
+        title.font = [UIFont boldSystemFontOfSize:10];
         title.textColor = [UIColor whiteColor];
         title.lineBreakMode = NSLineBreakByTruncatingTail;
-        [self addSubview:title];
+        [vc.view addSubview:title];
+
+        _muteBtn = [UIButton buttonWithType:UIButtonTypeSystem];
+        _muteBtn.frame = CGRectMake(w - 58, 4, 28, 24);
+        [_muteBtn setTitle:@"🔈" forState:UIControlStateNormal];
+        _muteBtn.tintColor = [UIColor whiteColor];
+        [_muteBtn addTarget:self action:@selector(toggleMute) forControlEvents:UIControlEventTouchUpInside];
+        [vc.view addSubview:_muteBtn];
 
         UIButton *close = [UIButton buttonWithType:UIButtonTypeSystem];
-        close.frame = CGRectMake(w - 30, 2, 28, 28);
+        close.frame = CGRectMake(w - 30, 4, 28, 24);
         [close setTitle:@"✕" forState:UIControlStateNormal];
         close.titleLabel.font = [UIFont boldSystemFontOfSize:16];
         close.tintColor = [UIColor whiteColor];
         [close addTarget:self action:@selector(close_) forControlEvents:UIControlEventTouchUpInside];
-        [self addSubview:close];
+        [vc.view addSubview:close];
 
         UIPanGestureRecognizer *pan = [[UIPanGestureRecognizer alloc] initWithTarget:self action:@selector(pan_:)];
-        [self addGestureRecognizer:pan];
+        [vc.view addGestureRecognizer:pan];
 
         UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(tap_:)];
-        [self addGestureRecognizer:tap];
+        [vc.view addGestureRecognizer:tap];
 
-        [self.player play];
+        [_player play];
+        self.hidden = NO;
     }
     return self;
 }
 
 - (void)layoutSubviews {
     [super layoutSubviews];
-    self.playerLayer.frame = self.bounds;
+    _playerLayer.frame = self.rootViewController.view.bounds;
 }
 
 - (void)pan_:(UIPanGestureRecognizer *)g {
-    CGPoint t = [g translationInView:self.superview];
-    CGPoint c = self.center;
-    c.x += t.x;
-    c.y += t.y;
-    self.center = c;
-    [g setTranslation:CGPointZero inView:self.superview];
+    CGPoint t = [g translationInView:nil];
+    CGRect f = self.frame;
+    f.origin.x += t.x;
+    f.origin.y += t.y;
+    self.frame = f;
+    [g setTranslation:CGPointZero inView:nil];
 }
 
 - (void)tap_:(UITapGestureRecognizer *)g {
-    if (self.player.rate > 0) {
-        [self.player pause];
+    if (_player.rate > 0) {
+        [_player pause];
     } else {
-        [self.player play];
+        [_player play];
     }
 }
 
+- (void)toggleMute {
+    _muted = !_muted;
+    _player.muted = _muted;
+    [_muteBtn setTitle:_muted ? @"🔇" : @"🔈" forState:UIControlStateNormal];
+}
+
 - (void)close_ {
-    [self.player pause];
-    [self.playerLayer removeFromSuperlayer];
-    self.player = nil;
-    [self removeFromSuperview];
+    [_player pause];
+    [_playerLayer removeFromSuperlayer];
+    _player = nil;
+    self.hidden = YES;
 }
 
 @end
@@ -97,8 +126,8 @@
 @end
 
 @implementation MRFloatManager {
-    UIWindow *_window;
-    NSMutableSet<NSString *> *_seen;
+    NSMutableSet<NSString *> *_keys;
+    NSMutableDictionary<NSString *, MRFloatWindow *> *_windows;
     NSUInteger _index;
 }
 
@@ -113,15 +142,9 @@
 
 - (instancetype)init {
     if ((self = [super init])) {
-        _seen = [NSMutableSet set];
+        _keys = [NSMutableSet set];
+        _windows = [NSMutableDictionary dictionary];
         _index = 0;
-        _window = [[UIWindow alloc] initWithFrame:[UIScreen mainScreen].bounds];
-        _window.windowLevel = UIWindowLevelAlert + 2;
-        _window.backgroundColor = [UIColor clearColor];
-        _window.rootViewController = [UIViewController new];
-        _window.rootViewController.view.backgroundColor = [UIColor clearColor];
-        _window.userInteractionEnabled = YES;
-        _window.hidden = NO;
     }
     return self;
 }
@@ -142,14 +165,17 @@
 
 - (void)presentURL:(NSURL *)url {
     NSString *key = url.absoluteString;
-    @synchronized (_seen) {
-        if ([_seen containsObject:key]) return;
-        [_seen addObject:key];
+    NSUInteger idx = 0;
+    @synchronized (self) {
+        if ([_keys containsObject:key]) return;
+        [_keys addObject:key];
+        idx = _index++;
     }
-    NSUInteger idx = _index++;
     dispatch_async(dispatch_get_main_queue(), ^{
-        MRFloatItemView *item = [[MRFloatItemView alloc] initWithURL:url index:idx];
-        [_window.rootViewController.view addSubview:item];
+        MRFloatWindow *w = [[MRFloatWindow alloc] initWithURL:url index:idx];
+        @synchronized (self) {
+            _windows[key] = w;
+        }
     });
 }
 

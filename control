@@ -1,6 +1,6 @@
 Package: com.mrfloat
 Name: MRFloat
-Version: 1.0.0
+Version: 1.0.1
 Architecture: iphoneos-arm64
 Description: 多视频独立悬浮播放 (Alook)
 Maintainer: mr <mr@example.com>
