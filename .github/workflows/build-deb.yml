@@ -14,7 +14,7 @@ jobs:
 
       - name: Setup Theos
         run: |
-          export THEOS=/opt/theos
+          export THEOS="$HOME/theos"
           git clone --recursive --depth 1 https://github.com/theos/theos.git "$THEOS"
           SDKPATH=$(xcrun --sdk iphoneos --show-sdk-path)
           mkdir -p "$THEOS/sdks"
